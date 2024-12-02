@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vorlem.cc</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link do pliku CSS -->
+    <style>
+        /* Stylizacja paska ładowania */
+        #loadingBar {
+            width: 0;
+            height: 5px;
+            background-color: #4caf50;
+            transition: width 1s ease-out;
+            margin-top: 10px;
+        }
+
+        /* Stylizacja kontenera z komunikatem błędu */
+        .alert {
+            color: red;
+            display: none;
+        }
+
+        .form-section {
+            margin: 20px 0;
+        }
+
+        /* Stylizacja IP, aby wyglądało na klikane */
+        .ip-address {
+            color: #007bff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Vorlem.cc</h1>
+
+        <!-- Sekcja kodu dostępu -->
+        <div id="accessCodeSection">
+            <p>Wprowadź kod dostępu:</p>
+            <input type="text" id="accessCode" placeholder="Wprowadź kod dostępu">
+            <button onclick="checkAccessCode()">Zaloguj się</button>
+            <div class="alert" id="errorAlert">Niepoprawny kod dostępu!</div>
+
+            <!-- Pasek ładowania -->
+            <div id="loadingBar"></div>
+        </div>
+
+        <!-- Sekcja wyszukiwania Nick:IP -->
+        <div id="searchSection" class="form-section" style="display: none;">
+            <r>Version BETA</r>
+            <p>Wprowadź nick, aby wyszukać:</p>
+            <input type="text" id="nickname" placeholder="Wprowadź nick">
+            <button onclick="searchIP()">Wyszukaj</button>
+
+            <div id="result"></div>
+        </div>
+
+        <!-- Sekcja tworzenia kodu dostępu -->
+        <div id="createCodeSection" class="form-section" style="display: none;">
+            <h2>Tworzenie kodu dostępu</h2>
+            <p>Wprowadź dane do stworzenia kodu dostępu:</p>
+            <input type="text" id="newCode" placeholder="Wprowadź nowy kod">
+            <input type="datetime-local" id="expiryTime" placeholder="Wybierz czas wygaśnięcia">
+            <button onclick="createAccessCode()">Stwórz kod dostępu</button>
+            <div id="generatedCode"></div> <!-- Zawartość wygenerowanego kodu -->
+        </div>
+
+        <!-- Sekcja dodawania użytkowników -->
+        <div id="addUserSection" class="form-section" style="display: none;">
+            <h2>Dodaj nowego użytkownika</h2>
+            <p>Wprowadź nick i IP nowego użytkownika:</p>
+            <input type="text" id="newNick" placeholder="Wprowadź nick użytkownika">
+            <input type="text" id="newIP" placeholder="Wprowadź IP użytkownika">
+            <button onclick="addUser()">Dodaj użytkownika</button>
+        </div>
+
+        <!-- Przyciski do wylogowania -->
+        <div id="logoutSection" class="form-section" style="display: none;">
+            <button onclick="logout()">Wyloguj się</button>
+        </div>
+    </div>
+
+    <script>
+// Baza danych kodów dostępu z datą wygaśnięcia
+let accessCodes = JSON.parse(localStorage.getItem("accessCodes")) || {};
+
+// Baza danych użytkowników (Nick:IP)
+let userDatabase = JSON.parse(localStorage.getItem("userDatabase")) || {
+    "test": "70.70.70.70",
+    "janek": "192.168.1.1",
+    "admin": "10.0.0.1"
+};
+
+// Przykładowe kody dostępu (można to potem zaktualizować z panelu admina)
+let codeToSearch = "search123";  // Kod do wyszukiwania
+const codeToAdd = "admin123";      // Kod do panelu admina
+
+// Funkcja sprawdzająca kod dostępu
+function checkAccessCode() {
+    const enteredCode = document.getElementById("accessCode").value;
+    const errorAlert = document.getElementById("errorAlert");
+    const loadingBar = document.getElementById("loadingBar");
+
+    if (enteredCode === codeToSearch || enteredCode === codeToAdd) {
+        // Pokaż pasek ładowania
+        loadingBar.style.width = "100%";
+        
+        // Po 1 sekundzie, zmień widoczność sekcji
+        setTimeout(function() {
+            localStorage.setItem("accessCode", enteredCode);  // Zapisz kod dostępu w localStorage
+            if (enteredCode === codeToSearch) {
+                document.getElementById("searchSection").style.display = "block";
+                document.getElementById("createCodeSection").style.display = "none";
+                document.getElementById("addUserSection").style.display = "none";
+            } else if (enteredCode === codeToAdd) {
+                document.getElementById("createCodeSection").style.display = "block";
+                document.getElementById("addUserSection").style.display = "block";
+                document.getElementById("searchSection").style.display = "none";
+            }
+            document.getElementById("accessCodeSection").style.display = "none";
+            document.getElementById("logoutSection").style.display = "block";
+            loadingBar.style.width = "0";  // Zresetuj pasek po zakończeniu
+            errorAlert.style.display = "none";
+        }, 1000);  // Animacja trwa przez 1 sekundę
+    } else {
+        errorAlert.style.display = "block";
+    }
+}
+
+// Funkcja tworzenia nowego kodu dostępu
+function createAccessCode() {
+    const newCode = document.getElementById("newCode").value;
+    const expiryTime = document.getElementById("expiryTime").value;
+
+    if (newCode && expiryTime) {
+        const expiryDate = new Date(expiryTime);
+        if (expiryDate > new Date()) {
+            // Dodaj nowy kod z datą wygaśnięcia
+            accessCodes[newCode] = { expiry: expiryDate.toISOString() };
+            localStorage.setItem("accessCodes", JSON.stringify(accessCodes));
+
+            // Zaktualizuj kod do wyszukiwania
+            codeToSearch = newCode;  // Aktualizujemy zmienną codeToSearch na nowy kod
+            localStorage.setItem("codeToSearch", codeToSearch);  // Zapisujemy nowy kod w localStorage
+
+            // Wyświetl wygenerowany kod dostępu
+            document.getElementById("generatedCode").innerText = `Wygenerowany kod dostępu: ${newCode}. Kod wygaśnie: ${expiryDate}`; 
+
+            // Resetowanie formularza
+            document.getElementById("newCode").value = '';
+            document.getElementById("expiryTime").value = '';
+        } else {
+            alert("Czas wygaśnięcia musi być w przyszłości!");
+        }
+    } else {
+        alert("Proszę wprowadzić kod i czas wygaśnięcia!");
+    }
+}
+
+// Funkcja dodawania nowego użytkownika
+function addUser() {
+    const newNick = document.getElementById("newNick").value;
+    const newIP = document.getElementById("newIP").value;
+
+    if (newNick && newIP) {
+        // Dodaj nowego użytkownika do bazy danych
+        userDatabase[newNick] = newIP;
+        localStorage.setItem("userDatabase", JSON.stringify(userDatabase));
+
+        alert(`Nowy użytkownik ${newNick}:${newIP} został dodany`);
+
+        // Resetowanie formularza
+        document.getElementById("newNick").value = '';
+        document.getElementById("newIP").value = '';
+    } else {
+        alert("Proszę wprowadzić nick i IP użytkownika!");
+    }
+}
+
+// Funkcja wyszukiwania IP na podstawie nicku
+function searchIP() {
+    const nickname = document.getElementById("nickname").value.toLowerCase();
+    const resultDiv = document.getElementById("result");
+
+    if (userDatabase[nickname]) {
+        const userIP = userDatabase[nickname];
+        resultDiv.innerHTML = `${nickname}: <span class="ip-address" onclick="copyToClipboard('${userIP}')">${userIP}</span>`;
+        resultDiv.style.color = "#28a745";
+    } else {
+        resultDiv.innerText = "Nie znaleziono tego nicku.";
+        resultDiv.style.color = "#ff4d4d";
+    }
+}
+
+// Funkcja kopiowania IP do schowka (bez alertu)
+function copyToClipboard(ip) {
+    const textarea = document.createElement("textarea");
+    textarea.value = ip;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+}
+
+// Funkcja logowania
+window.onload = function() {
+    const savedCode = localStorage.getItem("accessCode");
+    if (savedCode) {
+        // Jeśli kod jest zapisany, automatycznie przekieruj do odpowiedniej sekcji
+        if (savedCode === codeToSearch) {
+            document.getElementById("searchSection").style.display = "block";
+            document.getElementById("createCodeSection").style.display = "none";
+            document.getElementById("addUserSection").style.display = "none";
+        } else if (savedCode === codeToAdd) {
+            document.getElementById("createCodeSection").style.display = "block";
+            document.getElementById("addUserSection").style.display = "block";
+            document.getElementById("searchSection").style.display = "none";
+        }
+        document.getElementById("accessCodeSection").style.display = "none";
+        document.getElementById("logoutSection").style.display = "block";
+    } else {
+        document.getElementById("accessCodeSection").style.display = "block";
+        document.getElementById("logoutSection").style.display = "none";
+    }
+};
+
+// Funkcja wylogowania
+function logout() {
+    localStorage.removeItem("accessCode");
+    document.getElementById("accessCodeSection").style.display = "block";
+    document.getElementById("searchSection").style.display = "none";
+    document.getElementById("createCodeSection").style.display = "none";
+    document.getElementById("addUserSection").style.display = "none";
+    document.getElementById("logoutSection").style.display = "none";
+}
+    </script>
+
+</body>
+</html>
